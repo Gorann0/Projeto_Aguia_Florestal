@@ -35,20 +35,20 @@ async def get_current_user(
 
     # Verifica se a sessão existe e não expirou
     result = await db.execute(
-        select(Sessao).where(Sessao.token == token, Sessao.expira_em > datetime.utcnow())
-    )
+        select(Sessao).where(Sessao.token == token, Sessao.expira_em > datetime.now(timezone.utc)
+    ))
     sessao = result.scalar_one_or_none()
     if not sessao:
         raise HTTPException(status_code=401, detail="Sessão não encontrada ou expirada")
 
     # Busca o usuário ativo
-    result = await db.execute(select(Usuario).where(Usuario.id == usuario_id, Usuario.ativo == True))
+    result = await db.execute(select(Usuario).where(Usuario.id == usuario_id, Usuario.ativo.is_(True)))
     usuario = result.scalar_one_or_none()
     if not usuario:
         raise HTTPException(status_code=401, detail="Usuário não encontrado ou inativo")
 
     # Atualiza último acesso da sessão
-    sessao.ultima_ativacao = datetime.utcnow()
+    sessao.ultima_ativacao = datetime.now(timezone.utc)
     await db.commit()
 
     return usuario

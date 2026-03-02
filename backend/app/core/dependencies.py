@@ -35,8 +35,12 @@ async def get_current_user(
 
     # Verifica se a sessão existe e não expirou
     result = await db.execute(
-        select(Sessao).where(Sessao.token == token, Sessao.expira_em > datetime.now(timezone.utc)
-    ))
+    select(Sessao).where(
+        Sessao.token == token,
+        Sessao.expira_em > datetime.now(timezone.utc),
+        Sessao.revogado.is_(False)
+    )
+)
     sessao = result.scalar_one_or_none()
     if not sessao:
         raise HTTPException(status_code=401, detail="Sessão não encontrada ou expirada")

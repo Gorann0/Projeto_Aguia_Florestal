@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Boolean, DateTime, Text, ForeignKey
+from sqlalchemy import Column, Integer, String, Boolean, DateTime, Text, ForeignKey, CheckConstraint
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from app.core.database import Base
@@ -6,14 +6,21 @@ from app.core.database import Base
 
 class Usuario(Base):
     __tablename__ = "usuarios"
+    
+    __table_args__ = (
+        CheckConstraint(
+            "funcao IN ('admin', 'operador')",
+            name="ck_usuario_funcao"
+        ),
+    )
 
     id = Column(Integer, primary_key=True, index=True)
     nome_completo = Column(String(100), nullable=False)
-    apelido = Column(String(50), unique=True, nullable=False, index=True)
+    apelido = Column(String(50), unique=True, nullable=False)
     funcao = Column(String(20), nullable=False)  # 'admin' ou 'operador'
     hash_senha = Column(Text, nullable=False)
     icone_perfil = Column(String(255))  # caminho ou nome do ícone
-    ativo = Column(Boolean, default=True)
+    ativo = Column(Boolean, default=True, server_default="true")
     ultimo_login = Column(DateTime(timezone=True))
     
     # Auditoria

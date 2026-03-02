@@ -12,7 +12,7 @@ class Maquina(Base):
     modelo = Column(String(100))
     fabricante = Column(String(100))
     numero_serie = Column(String(100), unique=True)
-    ativo = Column(Boolean, default=True)
+    ativo = Column(Boolean, default=True, server_default="true")
     
     # Auditoria
     criado_em = Column(DateTime(timezone=True), server_default=func.now())

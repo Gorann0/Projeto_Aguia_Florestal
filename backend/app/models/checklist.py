@@ -54,7 +54,15 @@ class AgendamentoChecklist(Base):
 
     # Check constraint para status
     __table_args__ = (
-        CheckConstraint("status IN ('pendente', 'em_andamento', 'concluido')", name='ck_agendamento_status'),
+    CheckConstraint(
+        "status IN ('pendente', 'em_andamento', 'concluido')",
+        name='ck_agendamento_status'
+    ),
+    UniqueConstraint(
+        "maquina_id",
+        "data_vencimento",
+        name="uq_agendamento_maquina_data"
+    ),
     )
 
     def __repr__(self):

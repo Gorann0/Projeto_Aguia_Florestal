@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Text, DateTime, Numeric, ForeignKey, CheckConstraint, Index
+from sqlalchemy import Column, Integer, String, Text, DateTime, Numeric, ForeignKey, CheckConstraint, Index, Computed
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from app.core.database import Base
@@ -17,11 +17,12 @@ class OrdemServico(Base):
     # Coluna gerada para horas trabalhadas (PostgreSQL 12+)
     horas_trabalhadas = Column(
         Numeric(5, 2),
-        server_default=func.extract('epoch', func.coalesce(data_hora_fim, func.now()) - data_hora_inicio) / 3600,
-        deferred=True  # Não carrega automaticamente se não for solicitado
+         Computed(
+        "EXTRACT(EPOCH FROM (COALESCE(data_hora_fim, now()) - data_hora_inicio)) / 3600",
+        persisted=True)
     )
     
-    status = Column(String(20), default="aberta")  # aberta, em_andamento, concluida
+    status = Column(String(20), default="aberta", server_default="aberta")  # aberta, em_andamento, concluida
     operador_id = Column(Integer, ForeignKey("usuarios.id", ondelete="RESTRICT"), nullable=False)
     
     # Auditoria

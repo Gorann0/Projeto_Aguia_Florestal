@@ -28,6 +28,7 @@ from .ordem_servico import (
     OrdemServicoResponse, OrdemServicoListResponse, OrdemServicoDetailResponse,
     OrdemServicoStatusUpdate, OrdemServicoRelatorioResponse
 )
+from .token import TokenResponse
 
 __all__ = [
     # Usuário
@@ -55,4 +56,7 @@ __all__ = [
     "OrdemServicoBase", "OrdemServicoCreate", "OrdemServicoUpdate",
     "OrdemServicoResponse", "OrdemServicoListResponse", "OrdemServicoDetailResponse",
     "OrdemServicoStatusUpdate", "OrdemServicoRelatorioResponse"
+
+    # Token
+    "TokenResponse",
 ]

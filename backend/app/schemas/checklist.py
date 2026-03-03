@@ -1,8 +1,7 @@
-from pydantic import BaseModel, Field, ConfigDict, field_validator, model_validator
+from pydantic import BaseModel, Field, ConfigDict, model_validator
 from datetime import datetime, date
-from typing import Optional, List
+from typing import Optional, List, Literal
 from .maquina import MaquinaResponse
-from typing import Optional, Literal
 
 # ========== Modelos de Checklist ==========
 
@@ -86,7 +85,7 @@ class ItemChecklistBatchCreate(BaseModel):
 class AgendamentoBase(BaseModel):
     """Base schema para agendamento de checklist"""
     data_vencimento: date
-    status: str = Field("pendente", pattern="^(pendente|em_andamento|concluido)$")
+    status: Literal["pendente", "em_andamento", "concluido"] = "pendente"
     observacoes_gerais: Optional[str] = None
 
 
@@ -99,7 +98,7 @@ class AgendamentoCreate(AgendamentoBase):
 class AgendamentoUpdate(BaseModel):
     """Schema para atualização de agendamento"""
     data_vencimento: Optional[date] = None
-    status: Optional[str] = Field(None, pattern="^(pendente|em_andamento|concluido)$")
+    status: Optional[Literal["pendente", "em_andamento", "concluido"]] = None
     observacoes_gerais: Optional[str] = None
 
 
@@ -137,7 +136,7 @@ class AgendamentoPendenteResponse(AgendamentoResponse):
 class AgendamentoComItensResponse(AgendamentoResponse):
     """Schema para agendamento com seus itens"""
     maquina: MaquinaResponse
-    itens: List[ItemChecklistResponse]
+    itens: List[ItemChecklistResponse] = Field(default_factory=list)
     
     model_config = ConfigDict(from_attributes=True)
 
@@ -145,15 +144,21 @@ class AgendamentoComItensResponse(AgendamentoResponse):
 class ChecklistCompletoResponse(BaseModel):
     """Schema para resposta completa de checklist"""
     agendamento: AgendamentoComItensResponse
-    progresso: float = Field(..., ge=0, le=100)  # porcentagem concluída
-    
-    @field_validator('progresso')
-    @classmethod
-    def calculate_progress(cls, v, info):
-        if 'agendamento' in values:
-            agendamento = values['agendamento']
-            total_itens = len(agendamento.itens)
-            if total_itens > 0:
-                respondidos = sum(1 for item in agendamento.itens if item.resposta is not None)
-                return (respondidos / total_itens) * 100
-        return 0
+    progresso: float = Field(0, ge=0, le=100)
+
+    model_config = ConfigDict(from_attributes=True)
+
+    @model_validator(mode="after")
+    def calculate_progress(self):
+        total_itens = len(self.agendamento.itens)
+
+        if total_itens > 0:
+            respondidos = sum(
+                1 for item in self.agendamento.itens
+                if item.resposta is not None
+            )
+            self.progresso = (respondidos / total_itens) * 100
+        else:
+            self.progresso = 0
+
+        return self

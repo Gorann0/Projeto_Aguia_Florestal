@@ -1,6 +1,6 @@
-from pydantic import BaseModel, Field, ConfigDict, field_validator, model_validator
+from pydantic import BaseModel, Field, ConfigDict, model_validator
 from datetime import datetime
-from typing import Optional, List
+from typing import Optional, List, Literal, Dict, Any
 from .maquina import MaquinaResponse
 from .usuario import UsuarioResponse
 
@@ -11,7 +11,7 @@ class OrdemServicoBase(BaseModel):
     descricao_falha: str = Field(..., min_length=1)
     data_hora_inicio: datetime
     data_hora_fim: Optional[datetime] = None
-    status: str = Field("aberta", pattern="^(aberta|em_andamento|concluida)$")
+    status: Literal["aberta", "em_andamento", "concluida"] = "aberta"
 
 
 class OrdemServicoCreate(OrdemServicoBase):
@@ -24,10 +24,9 @@ class OrdemServicoCreate(OrdemServicoBase):
         if self.data_hora_inicio and self.data_hora_fim:
             if self.data_hora_fim < self.data_hora_inicio:
                 raise ValueError(
-                'data_hora_fim deve ser posterior a data_hora_inicio'
-            )
-    return self
-
+                    "data_hora_fim deve ser posterior a data_hora_inicio"
+                )
+        return self
 
 class OrdemServicoUpdate(BaseModel):
     """Schema para atualização de ordem de serviço"""
@@ -35,12 +34,12 @@ class OrdemServicoUpdate(BaseModel):
     descricao_falha: Optional[str] = Field(None, min_length=1)
     data_hora_inicio: Optional[datetime] = None
     data_hora_fim: Optional[datetime] = None
-    status: Optional[str] = Field(None, pattern="^(aberta|em_andamento|concluida)$")
+    status: Optional[Literal["aberta", "em_andamento", "concluida"]] = None
     
 
 class OrdemServicoStatusUpdate(BaseModel):
     """Schema para atualização apenas do status"""
-    status: str = Field(..., pattern="^(aberta|em_andamento|concluida)$")
+    status: Literal["aberta", "em_andamento", "concluida"]
 
 
 class OrdemServicoResponse(OrdemServicoBase):
@@ -80,8 +79,8 @@ class OrdemServicoRelatorioResponse(BaseModel):
     total_os: int
     total_horas: float
     media_horas_por_os: float
-    os_por_status: dict
-    os_por_operador: List[dict]
-    os_por_maquina: List[dict]
+    os_por_status: Dict[str, int]
+    os_por_operador: List[Dict[str, Any]]
+    os_por_maquina: List[Dict[str, Any]]
     periodo_inicio: datetime
     periodo_fim: datetime

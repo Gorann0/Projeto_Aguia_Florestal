@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field, ConfigDict, field_validator, model_validator
+from pydantic import BaseModel, Field, ConfigDict
 from datetime import datetime
 from typing import Optional, List
 
@@ -13,7 +13,7 @@ class ManualBase(BaseModel):
 class ManualCreate(ManualBase):
     """Schema para criação de manual"""
     maquina_id: int
-    arquivo_pdf: str  # caminho do arquivo
+    arquivo_pdf: str = Field(..., max_length=255)  # caminho do arquivo
 
 
 class ManualUpdate(BaseModel):
@@ -21,7 +21,7 @@ class ManualUpdate(BaseModel):
     titulo: Optional[str] = Field(None, min_length=1, max_length=200)
     versao: Optional[str] = Field(None, max_length=20)
     descricao: Optional[str] = None
-    arquivo_pdf: Optional[str] = None
+    arquivo_pdf: Optional[str] = Field(None, max_length=255)
 
 
 class ManualResponse(ManualBase):

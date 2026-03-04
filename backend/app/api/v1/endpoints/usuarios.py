@@ -9,7 +9,7 @@ from app.schemas.usuario import (
     UsuarioCreate, UsuarioUpdate, UsuarioResponse, UsuarioListResponse,
     UsuarioPerfilResponse
 )
-from app.api.v1.dependencies import get_current_admin_user, get_current_user
+from app.api.v1.dependencies import get_current_admin_user
 from app.core.security import get_password_hash
 
 router = APIRouter()

@@ -8,7 +8,7 @@ from app.models.maquina import Maquina
 from app.models.manual import Manual
 from app.schemas.maquina import (
     MaquinaCreate, MaquinaUpdate, MaquinaResponse, MaquinaListResponse,
-    MaquinaComManuaisResponse, MaquinaComChecklistsResponse
+    MaquinaComManuaisResponse
 )
 from app.api.v1.dependencies import get_current_user, get_current_admin_user
 from app.models.usuario import Usuario
@@ -119,7 +119,8 @@ async def atualizar_maquina(
             raise HTTPException(status_code=400, detail="Número de série já cadastrado")
 
     for field, value in maquina_data.model_dump(exclude_unset=True).items():
-        setattr(maquina, field, value)
+        if value is not None:
+            setattr(maquina, field, value)
 
     maquina.atualizado_por_id = current_user.id
     await db.commit()
@@ -146,7 +147,7 @@ async def deletar_maquina(
     return None
 
 
-@router.get("/{maquina_id}/manuais", response_model=List[MaquinaComManuaisResponse])
+@router.get("/{maquina_id}/manuais", response_model=MaquinaComManuaisResponse)
 async def listar_manuais_da_maquina(
     maquina_id: int,
     db: AsyncSession = Depends(get_db),

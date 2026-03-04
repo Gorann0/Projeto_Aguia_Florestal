@@ -1,9 +1,9 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func, and_
-from sqlalchemy.orm import selectinload
-from typing import Optional, List
-from datetime import datetime, timedelta
+from sqlalchemy import select, func
+from sqlalchemy.orm import 
+from typing import Optional
+from datetime import datetime, timezone
 
 from app.core.database import get_db
 from app.models.ordem_servico import OrdemServico
@@ -14,7 +14,7 @@ from app.schemas.ordem_servico import (
     OrdemServicoListResponse, OrdemServicoDetailResponse,
     OrdemServicoStatusUpdate, OrdemServicoRelatorioResponse
 )
-from app.api.v1.dependencies import get_current_user, get_current_admin_user
+from app.api.v1.dependencies import get_current_user, get_current_admin_user, get_current_user_or_admin_for_os
 
 router = APIRouter()
 
@@ -101,54 +101,18 @@ async def criar_ordem_servico(
     return os
 
 
-@router.get("/{os_id}", response_model=OrdemServicoDetailResponse)
-async def obter_ordem_servico(
-    os_id: int,
-    db: AsyncSession = Depends(get_db),
-    current_user: Usuario = Depends(get_current_user),
-):
-    """
-    Retorna detalhes de uma OS, incluindo dados da máquina e operador.
-    """
-    os = await db.get(OrdemServico, os_id)
-    if not os:
-        raise HTTPException(status_code=404, detail="Ordem de serviço não encontrada")
-
-    # Carrega relacionamentos
-    maquina = await db.get(Maquina, os.maquina_id)
-    operador = await db.get(Usuario, os.operador_id)
-    criado_por = await db.get(Usuario, os.criado_por_id) if os.criado_por_id else None
-
-    return {
-        **os.__dict__,
-        "maquina": maquina,
-        "operador": operador,
-        "criado_por": criado_por,
-    }
-
-
 @router.put("/{os_id}", response_model=OrdemServicoResponse)
 async def atualizar_ordem_servico(
-    os_id: int,
     os_data: OrdemServicoUpdate,
+    os: OrdemServico = Depends(get_current_user_or_admin_for_os),
     db: AsyncSession = Depends(get_db),
     current_user: Usuario = Depends(get_current_user),
 ):
     """
     Atualiza uma OS. Apenas o operador responsável ou admin pode atualizar.
     """
-    os = await db.get(OrdemServico, os_id)
-    if not os:
-        raise HTTPException(status_code=404, detail="Ordem de serviço não encontrada")
 
-    # Verifica permissão: operador responsável ou admin
-    if current_user.funcao != "admin" and os.operador_id != current_user.id:
-        raise HTTPException(
-            status_code=403,
-            detail="Você só pode atualizar suas próprias ordens de serviço"
-        )
-
-    # Se estiver concluindo, verifica se data_fim foi preenchida
+    # Regra extra para concluir
     if os_data.status == "concluida" and not os_data.data_hora_fim and not os.data_hora_fim:
         raise HTTPException(
             status_code=400,
@@ -159,7 +123,8 @@ async def atualizar_ordem_servico(
         setattr(os, field, value)
 
     os.atualizado_por_id = current_user.id
-    os.atualizado_em = datetime.utcnow()
+    os.atualizado_em = datetime.now(timezone.utc)
+
     await db.commit()
     await db.refresh(os)
     return os
@@ -167,30 +132,23 @@ async def atualizar_ordem_servico(
 
 @router.patch("/{os_id}/status", response_model=OrdemServicoResponse)
 async def atualizar_status_os(
-    os_id: int,
     status_data: OrdemServicoStatusUpdate,
+    os: OrdemServico = Depends(get_current_user_or_admin_for_os),
     db: AsyncSession = Depends(get_db),
     current_user: Usuario = Depends(get_current_user),
 ):
     """
     Atualiza apenas o status da OS (útil para iniciar/parar cronômetro).
     """
-    os = await db.get(OrdemServico, os_id)
-    if not os:
-        raise HTTPException(status_code=404, detail="Ordem de serviço não encontrada")
-
-    # Verifica permissão
-    if current_user.funcao != "admin" and os.operador_id != current_user.id:
-        raise HTTPException(status_code=403, detail="Permissão negada")
 
     # Regras de transição de status
     if status_data.status == "concluida" and not os.data_hora_fim:
         # Se não tem data_fim, define agora
-        os.data_hora_fim = datetime.utcnow()
+        os.data_hora_fim = datetime.now(timezone.utc)
 
     os.status = status_data.status
     os.atualizado_por_id = current_user.id
-    os.atualizado_em = datetime.utcnow()
+    os.atualizado_em = datetime.now(timezone.utc)
     await db.commit()
     await db.refresh(os)
     return os

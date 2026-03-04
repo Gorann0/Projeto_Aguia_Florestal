@@ -1,12 +1,12 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, delete
-from datetime import datetime, timedelta
+from sqlalchemy import select
+from datetime import datetime, timedelta, timezone
 from typing import List
 
 from app.core.database import get_db
-from app.core.security import create_access_token, verify_password, get_password_hash
+from app.core.security import create_access_token, verify_password
 from app.core.config import settings
 from app.models.usuario import Usuario
 from app.models.sessao import Sessao
@@ -35,17 +35,12 @@ async def listar_perfis(
 async def login(
     login_data: UsuarioLogin,
     db: AsyncSession = Depends(get_db),
-    dispositivo_valido: bool = Depends(lambda: validar_dispositivo(login_data.dispositivo_id)),
 ):
     """
     Realiza o login do usuário com apelido e senha, gerando token JWT.
     """
-    if not dispositivo_valido:
-        raise HTTPException(
-            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-            detail="Número máximo de sessões atingido para este dispositivo",
-        )
 
+    await validar_dispositivo(login_data.dispositivo_id, db)
     # Busca usuário pelo apelido
     result = await db.execute(
         select(Usuario).where(Usuario.apelido == login_data.apelido, Usuario.ativo == True)
@@ -68,7 +63,7 @@ async def login(
     result = await db.execute(
         select(Sessao).where(
             Sessao.usuario_id == usuario.id,
-            Sessao.expira_em > datetime.utcnow()
+            Sessao.expira_em > datetime.now(timezone.utc)
         )
     )
     sessoes_ativas = result.scalars().all()
@@ -91,12 +86,12 @@ async def login(
         usuario_id=usuario.id,
         token=access_token,
         dispositivo_id=login_data.dispositivo_id,
-        expira_em=datetime.utcnow() + access_token_expires,
+        expira_em=datetime.now(timezone.utc) + access_token_expires,
     )
     db.add(sessao)
 
     # Atualiza último login
-    usuario.ultimo_login = datetime.utcnow()
+    usuario.ultimo_login = datetime.now(timezone.utc)
     await db.commit()
 
     return {
@@ -133,7 +128,7 @@ async def refresh_token(
     """
     # Busca sessão pelo token
     result = await db.execute(
-        select(Sessao).where(Sessao.token == token, Sessao.expira_em > datetime.utcnow())
+        select(Sessao).where(Sessao.token == token, Sessao.expira_em > datetime.now(timezone.utc))
     )
     sessao = result.scalar_one_or_none()
     if not sessao:
@@ -156,8 +151,8 @@ async def refresh_token(
 
     # Atualiza sessão: novo token e nova expiração
     sessao.token = new_token
-    sessao.expira_em = datetime.utcnow() + access_token_expires
-    sessao.ultima_ativacao = datetime.utcnow()
+    sessao.expira_em = datetime.now(timezone.utc) + access_token_expires
+    sessao.ultima_ativacao = datetime.now(timezone.utc)
     await db.commit()
 
     return {

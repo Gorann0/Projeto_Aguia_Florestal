@@ -1,7 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
-from sqlalchemy.orm import 
 from typing import Optional
 from datetime import datetime, timezone
 
@@ -11,13 +10,77 @@ from app.models.maquina import Maquina
 from app.models.usuario import Usuario
 from app.schemas.ordem_servico import (
     OrdemServicoCreate, OrdemServicoUpdate, OrdemServicoResponse,
-    OrdemServicoListResponse, OrdemServicoDetailResponse,
-    OrdemServicoStatusUpdate, OrdemServicoRelatorioResponse
+    OrdemServicoListResponse, OrdemServicoStatusUpdate, OrdemServicoRelatorioResponse
 )
 from app.api.v1.dependencies import get_current_user, get_current_admin_user, get_current_user_or_admin_for_os
 
 router = APIRouter()
 
+
+@router.get("/relatorios/ppr", response_model=OrdemServicoRelatorioResponse)
+async def relatorio_ppr(
+    data_inicio: datetime,
+    data_fim: datetime,
+    operador_id: Optional[int] = None,
+    db: AsyncSession = Depends(get_db),
+    current_user: Usuario = Depends(get_current_admin_user),  # apenas admin
+):
+    """
+    Gera relatório para cálculo de PPR: total de horas trabalhadas por operador/período.
+    """
+    # Base query
+    query = select(OrdemServico).where(
+        OrdemServico.data_hora_inicio >= data_inicio,
+        OrdemServico.data_hora_fim <= data_fim,
+        OrdemServico.status == "concluida"
+    )
+    if operador_id:
+        query = query.where(OrdemServico.operador_id == operador_id)
+
+    result = await db.execute(query)
+    ordens = result.scalars().all()
+
+    # Cálculos
+    total_horas = sum(os.horas_trabalhadas or 0 for os in ordens)
+    total_os = len(ordens)
+    media_horas = total_horas / total_os if total_os > 0 else 0
+
+    # Agrupa por status (só concluídas, mas pode ter variação)
+    os_por_status = {"concluida": total_os}
+
+    # Por operador
+    from collections import defaultdict
+    op_dict = defaultdict(lambda: {"qtd": 0, "horas": 0.0})
+    for os in ordens:
+        op_dict[os.operador_id]["qtd"] += 1
+        op_dict[os.operador_id]["horas"] += os.horas_trabalhadas or 0
+
+    os_por_operador = [
+        {"operador_id": k, "quantidade": v["qtd"], "horas_totais": v["horas"]}
+        for k, v in op_dict.items()
+    ]
+
+    # Por máquina
+    maq_dict = defaultdict(lambda: {"qtd": 0, "horas": 0.0})
+    for os in ordens:
+        maq_dict[os.maquina_id]["qtd"] += 1
+        maq_dict[os.maquina_id]["horas"] += os.horas_trabalhadas or 0
+
+    os_por_maquina = [
+        {"maquina_id": k, "quantidade": v["qtd"], "horas_totais": v["horas"]}
+        for k, v in maq_dict.items()
+    ]
+
+    return {
+        "total_os": total_os,
+        "total_horas": total_horas,
+        "media_horas_por_os": media_horas,
+        "os_por_status": os_por_status,
+        "os_por_operador": os_por_operador,
+        "os_por_maquina": os_por_maquina,
+        "periodo_inicio": data_inicio,
+        "periodo_fim": data_fim,
+    }
 
 @router.get("/", response_model=OrdemServicoListResponse)
 async def listar_ordens_servico(
@@ -158,81 +221,15 @@ async def atualizar_status_os(
 async def deletar_ordem_servico(
     os_id: int,
     db: AsyncSession = Depends(get_db),
-    current_user: Usuario = Depends(get_current_admin_user),  # apenas admin
+    current_user: Usuario = Depends(get_current_admin_user),
 ):
-    """
-    Remove uma OS (apenas admin).
-    """
     os = await db.get(OrdemServico, os_id)
+
     if not os:
-        raise HTTPException(status_code=404, detail="Ordem de serviço não encontrada")
+        raise HTTPException(status_code=404, detail="OS não encontrada")
 
     await db.delete(os)
     await db.commit()
+
     return None
 
-
-@router.get("/relatorios/ppr", response_model=OrdemServicoRelatorioResponse)
-async def relatorio_ppr(
-    data_inicio: datetime,
-    data_fim: datetime,
-    operador_id: Optional[int] = None,
-    db: AsyncSession = Depends(get_db),
-    current_user: Usuario = Depends(get_current_admin_user),  # apenas admin
-):
-    """
-    Gera relatório para cálculo de PPR: total de horas trabalhadas por operador/período.
-    """
-    # Base query
-    query = select(OrdemServico).where(
-        OrdemServico.data_hora_inicio >= data_inicio,
-        OrdemServico.data_hora_fim <= data_fim,
-        OrdemServico.status == "concluida"
-    )
-    if operador_id:
-        query = query.where(OrdemServico.operador_id == operador_id)
-
-    result = await db.execute(query)
-    ordens = result.scalars().all()
-
-    # Cálculos
-    total_horas = sum(os.horas_trabalhadas or 0 for os in ordens)
-    total_os = len(ordens)
-    media_horas = total_horas / total_os if total_os > 0 else 0
-
-    # Agrupa por status (só concluídas, mas pode ter variação)
-    os_por_status = {"concluida": total_os}
-
-    # Por operador
-    from collections import defaultdict
-    op_dict = defaultdict(lambda: {"qtd": 0, "horas": 0.0})
-    for os in ordens:
-        op_dict[os.operador_id]["qtd"] += 1
-        op_dict[os.operador_id]["horas"] += os.horas_trabalhadas or 0
-
-    os_por_operador = [
-        {"operador_id": k, "quantidade": v["qtd"], "horas_totais": v["horas"]}
-        for k, v in op_dict.items()
-    ]
-
-    # Por máquina
-    maq_dict = defaultdict(lambda: {"qtd": 0, "horas": 0.0})
-    for os in ordens:
-        maq_dict[os.maquina_id]["qtd"] += 1
-        maq_dict[os.maquina_id]["horas"] += os.horas_trabalhadas or 0
-
-    os_por_maquina = [
-        {"maquina_id": k, "quantidade": v["qtd"], "horas_totais": v["horas"]}
-        for k, v in maq_dict.items()
-    ]
-
-    return {
-        "total_os": total_os,
-        "total_horas": total_horas,
-        "media_horas_por_os": media_horas,
-        "os_por_status": os_por_status,
-        "os_por_operador": os_por_operador,
-        "os_por_maquina": os_por_maquina,
-        "periodo_inicio": data_inicio,
-        "periodo_fim": data_fim,
-    }

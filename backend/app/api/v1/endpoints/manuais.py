@@ -1,14 +1,14 @@
 import os
-import shutil
+import re
 from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, Form
 from fastapi.responses import FileResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
 from typing import Optional, List
-from datetime import datetime
 import uuid
 
 from app.core.database import get_db
+from app.core.config import settings
 from app.models.manual import Manual
 from app.models.maquina import Maquina
 from app.models.usuario import Usuario
@@ -21,7 +21,9 @@ from app.api.v1.dependencies import get_current_user, get_current_admin_user
 router = APIRouter()
 
 # Configuração do diretório de uploads
-UPLOAD_DIR = "uploads/manuais"
+UPLOAD_DIR = settings.MANUAL_UPLOAD_DIR
+MAX_FILE_SIZE = 10 * 1024 * 1024 # 10MB
+
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
 
@@ -77,20 +79,36 @@ async def upload_manual(
         raise HTTPException(status_code=404, detail="Máquina não encontrada")
 
     # Valida extensão do arquivo
-    if not arquivo.filename.lower().endswith('.pdf'):
-        raise HTTPException(status_code=400, detail="Apenas arquivos PDF são permitidos")
+    if not arquivo.filename.lower().endswith(".pdf") or arquivo.content_type != "application/pdf":
+        raise HTTPException(
+            status_code=400,
+            detail="Apenas arquivos PDF são permitidos"
+        )
 
     # Gera nome único para o arquivo
     file_extension = os.path.splitext(arquivo.filename)[1]
     file_name = f"{uuid.uuid4()}{file_extension}"
     file_path = os.path.join(UPLOAD_DIR, file_name)
 
+    # Lê o arquivo em memória
+    conteudo = await arquivo.read()
+
+    # Valida tamanho do arquivo
+    if len(conteudo) > MAX_FILE_SIZE:
+        raise HTTPException(
+            status_code=400,
+            detail="Arquivo excede o tamanho máximo de 10MB"
+        )
+
     # Salva o arquivo
     try:
         with open(file_path, "wb") as buffer:
-            shutil.copyfileobj(arquivo.file, buffer)
+          buffer.write(conteudo)
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Erro ao salvar arquivo: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Erro ao salvar arquivo: {str(e)}"
+        )
 
     # Cria registro no banco
     manual = Manual(
@@ -131,10 +149,12 @@ async def download_manual(
         raise HTTPException(status_code=404, detail="Arquivo não encontrado no servidor")
 
     # Retorna o arquivo para download
+    safe_name = re.sub(r'[^a-zA-Z0-9_-]', '_', manual.titulo)
+
     return FileResponse(
         path=manual.arquivo_pdf,
-        filename=f"{manual.titulo}.pdf",
-        media_type='application/pdf'
+        filename=f"{safe_name}.pdf",
+        media_type="application/pdf"
     )
 
 

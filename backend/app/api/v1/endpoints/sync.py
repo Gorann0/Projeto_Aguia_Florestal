@@ -1,8 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, update
-from typing import List, Dict, Any
-from datetime import datetime
+from sqlalchemy import select
+from datetime import datetime, timezone
 
 from app.core.database import get_db
 from app.models.usuario import Usuario
@@ -16,7 +15,7 @@ from app.api.v1.dependencies import get_current_user
 router = APIRouter()
 
 
-@router.post("/pull")
+@router.post("/pull", response_model=SyncResponse)
 async def pull_updates(
     last_sync: datetime,
     db: AsyncSession = Depends(get_db),
@@ -33,14 +32,14 @@ async def pull_updates(
     # Máquinas
     maquinas_result = await db.execute(
         select(Maquina).where(
-            (Maquina.criado_em >= last_sync) | (Maquina.atualizado_em >= last_sync)
-        )
+            (Maquina.criado_em >= last_sync) | (Maquina.atualizado_em >= last_sync) 
+        ).order_by(Maquina.atualizado_em)
     )
     maquinas = maquinas_result.scalars().all()
 
     # Manuais
     manuais_result = await db.execute(
-        select(Manual).where(Manual.enviado_em >= last_sync)
+        select(Manual).where(Manual.enviado_em >= last_sync).order_by(Manual.enviado_em)
     )
     manuais = manuais_result.scalars().all()
 
@@ -50,13 +49,13 @@ async def pull_updates(
             (AgendamentoChecklist.criado_em >= last_sync) |
             (AgendamentoChecklist.atualizado_em >= last_sync) |
             (AgendamentoChecklist.concluido_em >= last_sync)
-        )
+        ).order_by(AgendamentoChecklist.atualizado_em)
     )
     agendamentos = agendamentos_result.scalars().all()
 
     # Itens de checklist
     itens_result = await db.execute(
-        select(ItemChecklist).where(ItemChecklist.respondido_em >= last_sync)
+        select(ItemChecklist).where(ItemChecklist.respondido_em >= last_sync).order_by(ItemChecklist.respondido_em)
     )
     itens = itens_result.scalars().all()
 
@@ -65,12 +64,12 @@ async def pull_updates(
         select(OrdemServico).where(
             (OrdemServico.criado_em >= last_sync) |
             (OrdemServico.atualizado_em >= last_sync)
-        )
+        ).order_by(OrdemServico.atualizado_em)
     )
     ordens = os_result.scalars().all()
 
     return {
-        "timestamp": datetime.utcnow(),
+        "timestamp": datetime.now(timezone.utc),
         "maquinas": maquinas,
         "manuais": manuais,
         "agendamentos": agendamentos,
@@ -79,7 +78,7 @@ async def pull_updates(
     }
 
 
-@router.post("/push")
+@router.post("/push", response_model=SyncResponse)
 async def push_updates(
     sync_data: SyncRequest,
     db: AsyncSession = Depends(get_db),
@@ -93,7 +92,7 @@ async def push_updates(
     applied = []
 
     # Exemplo de processamento de ordens de serviço
-    for os_data in sync_data.ordens_servico:
+    for os_data in sync_data.ordens_servico or []:
         # Verifica se já existe
         existing = await db.get(OrdemServico, os_data.id)
         if existing:
@@ -103,7 +102,7 @@ async def push_updates(
                 for key, value in os_data.model_dump(exclude_unset=True).items():
                     setattr(existing, key, value)
                 existing.atualizado_por_id = current_user.id
-                existing.atualizado_em = datetime.utcnow()
+                existing.atualizado_em = datetime.now(timezone.utc)
                 applied.append({"id": os_data.id, "tipo": "ordem_servico", "acao": "atualizado"})
             else:
                 # Conflito: versão local mais antiga
@@ -111,20 +110,34 @@ async def push_updates(
                     "id": os_data.id,
                     "tipo": "ordem_servico",
                     "mensagem": "Versão local mais antiga que a do servidor"
+                    "server_timestamp": existing.atualizado_em
                 })
         else:
             # Novo registro
-            nova_os = OrdemServico(**os_data.model_dump(), criado_por_id=current_user.id)
+            data = os_data.model_dump(exclude_unset=True)
+
+            data.pop("criado_por_id", None)
+            
+            data["criado_por_id"] = current_user.id
+
+            nova_os = OrdemServico(**data)
+
             db.add(nova_os)
-            applied.append({"id": os_data.id, "tipo": "ordem_servico", "acao": "criado"})
+
+            applied.append({
+                "id": os_data.id,
+                "tipo": "ordem_servico",
+                "acao": "criado"
+            })
 
     # Processar outros tipos (itens, agendamentos, etc.)
     # ...
 
+    await db.flush()
     await db.commit()
 
-    return {
-        "applied": applied,
-        "conflicts": conflicts,
-        "timestamp": datetime.utcnow()
-    }
+    return SyncResponse(
+        applied=applied,
+        conflicts=conflicts,
+        timestamp=datetime.now(timezone.utc)
+    )

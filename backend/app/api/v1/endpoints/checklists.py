@@ -3,7 +3,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, and_
 from sqlalchemy.orm import selectinload
 from typing import Optional, List
-from datetime import date, datetime
+from datetime import date, datetime, timezone
 
 from app.core.database import get_db
 from app.models.checklist import ModeloChecklist, AgendamentoChecklist, ItemChecklist
@@ -347,7 +347,7 @@ async def responder_item(
         item.resposta = item_data.resposta
     if item_data.observacao is not None:
         item.observacao = item_data.observacao
-    item.respondido_em = datetime.utcnow()
+    item.respondido_em = datetime.now(timezone.utc)
     item.respondido_por_id = current_user.id
 
     # Se todos os itens foram respondidos, atualiza status do agendamento
@@ -358,7 +358,7 @@ async def responder_item(
     todos_itens = itens_result.scalars().all()
     if all(i.resposta is not None for i in todos_itens):
         agendamento.status = "concluido"
-        agendamento.concluido_em = datetime.utcnow()
+        agendamento.concluido_em = datetime.now(timezone.utc)
         agendamento.concluido_por_id = current_user.id
     else:
         if agendamento.status == "pendente":
@@ -386,7 +386,7 @@ async def concluir_agendamento(
         raise HTTPException(status_code=400, detail="Agendamento já está concluído")
 
     agendamento.status = "concluido"
-    agendamento.concluido_em = datetime.utcnow()
+    agendamento.concluido_em = datetime.now(timezone.utc)
     agendamento.concluido_por_id = current_user.id
     await db.commit()
     await db.refresh(agendamento)

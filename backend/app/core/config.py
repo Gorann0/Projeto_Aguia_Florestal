@@ -19,6 +19,8 @@ class Settings(BaseSettings):
     # Sessões simultâneas
     MAX_SESSIONS_PER_USER: int = 3
 
+    MANUAL_UPLOAD_DIR: str = "uploads/manuais"
+
     # CORS
     CORS_ORIGINS: List[str] = ["http://localhost:8000", "http://127.0.0.1:8000"]
 

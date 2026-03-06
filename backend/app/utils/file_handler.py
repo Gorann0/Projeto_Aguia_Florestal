@@ -3,8 +3,10 @@ import shutil
 import uuid
 from fastapi import UploadFile, HTTPException
 from pathlib import Path
+from app.core.config import settings
 
-UPLOAD_DIR = Path("uploads/manuais")
+
+UPLOAD_DIR = Path(settings.MANUAL_UPLOAD_DIR)
 UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 
 ALLOWED_EXTENSIONS = {".pdf"}

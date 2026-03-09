@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=yes">
+    <title>Águia Florestal · Hub</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        .bg-floresta {
+            background-color: #2d6a4f;
+        }
+
+        .text-floresta {
+            color: #2d6a4f;
+        }
+
+        .hover-bg-floresta:hover {
+            background-color: #1b4b34;
+        }
+    </style>
+    <link rel="manifest" href="manifest.json">
+</head>
+
+<body class="bg-gray-100 min-h-screen p-4">
+    <div class="max-w-4xl mx-auto">
+        <!-- Cabeçalho com perfil logado -->
+        <div class="flex justify-between items-center mb-8">
+            <h1 class="text-2xl font-bold text-floresta">Olá, <span id="user-name">Carregando...</span></h1>
+            <button id="logout"
+                class="text-sm bg-red-100 text-red-700 px-3 py-1 rounded-full hover:bg-red-200">Sair</button>
+        </div>
+
+        <!-- Cards dos módulos -->
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <!-- Módulo Biblioteca -->
+            <a href="modules/biblioteca/index.html"
+                class="bg-white rounded-xl shadow-md p-6 hover:shadow-lg transition flex flex-col items-center text-center">
+                <div
+                    class="w-20 h-20 bg-floresta rounded-full text-white flex items-center justify-center text-4xl mb-4">
+                    📚</div>
+                <h2 class="text-xl font-bold text-floresta">Biblioteca</h2>
+                <p class="text-gray-600 mt-2">Manuais e documentos das máquinas</p>
+            </a>
+
+            <!-- Módulo Checklist -->
+            <a href="modules/checklist/index.html"
+                class="bg-white rounded-xl shadow-md p-6 hover:shadow-lg transition flex flex-col items-center text-center">
+                <div
+                    class="w-20 h-20 bg-floresta rounded-full text-white flex items-center justify-center text-4xl mb-4">
+                    ✅</div>
+                <h2 class="text-xl font-bold text-floresta">Checklist</h2>
+                <p class="text-gray-600 mt-2">Inspeções preventivas mensais</p>
+            </a>
+
+            <!-- Módulo Ordens de Serviço -->
+            <a href="modules/os/index.html"
+                class="bg-white rounded-xl shadow-md p-6 hover:shadow-lg transition flex flex-col items-center text-center">
+                <div
+                    class="w-20 h-20 bg-floresta rounded-full text-white flex items-center justify-center text-4xl mb-4">
+                    🔧</div>
+                <h2 class="text-xl font-bold text-floresta">Ordens de Serviço</h2>
+                <p class="text-gray-600 mt-2">Manutenções corretivas</p>
+            </a>
+        </div>
+
+        <!-- Status de sincronização -->
+        <div class="mt-8 text-center text-sm text-gray-500">
+            <span id="sync-status">🔄 Sincronizado</span>
+        </div>
+    </div>
+
+    <script src="js/config.js"></script>
+    <script src="js/api.js"></script>
+    <script src="js/auth.js"></script>
+    <script src="js/db.js"></script>
+    <script src="js/sync.js"></script>
+    <script src="js/utils.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            // Verificar login primeiro
+            if (!sessionStorage.getItem('token')) {
+                window.location.href = 'index.html';
+                return;
+            }
+
+            api.setUnauthorizedHandler(() => {
+                sessionStorage.clear();
+                window.location.href = 'index.html';
+            });
+
+            // Atualizar status offline
+            if (!navigator.onLine) {
+                document.getElementById('sync-status').innerHTML = '⚠️ Offline · modo local';
+            }
+        
+            // Exibir nome do usuário (salvo no login)
+            let user = {};
+
+            try {
+                user = JSON.parse(sessionStorage.getItem('user')) || {};
+            } catch {
+                user = {};
+            }
+            document.getElementById('user-name').textContent = user.nome || 'Usuário';
+
+            // Logout
+            document.getElementById('logout').addEventListener('click', () => {
+                sessionStorage.removeItem('token');
+                sessionStorage.removeItem('user');
+                window.location.href = 'index.html';
+            });
+
+            // Disparar sincronização inicial (push + pull)
+            if (navigator.onLine) {
+                executarSincronizacao();
+            }
+
+            // Monitorar conexão
+            window.addEventListener('online', () => {
+                document.getElementById('sync-status').innerHTML = '📶 Online · sincronizando...';
+                executarSincronizacao();
+            });
+            window.addEventListener('offline', () => {
+                document.getElementById('sync-status').innerHTML = '⚠️ Offline · modo local';
+            });
+
+            async function executarSincronizacao() {
+                try {
+                    await sync.push();
+                } catch (e) {
+                    console.warn("Erro no push", e);
+                }
+
+                try {
+                    await sync.pull();
+                    document.getElementById('sync-status').innerHTML = '✅ Sincronizado';
+                } catch (error) {
+                    document.getElementById('sync-status').innerHTML = '❌ Erro na sincronização';
+                }
+            }
+        });
+    </script>
+</body>
+
+</html>

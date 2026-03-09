@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=yes">
+    <title>Águia Florestal · Login</title>
+    <!-- Tailwind CSS via CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Cores personalizadas (verde floresta) -->
+    <style>
+        .bg-floresta {
+            background-color: #2d6a4f;
+        }
+
+        .text-floresta {
+            color: #2d6a4f;
+        }
+
+        .hover-bg-floresta:hover {
+            background-color: #1b4b34;
+        }
+    </style>
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#2d6a4f">
+</head>
+
+<body class="bg-gray-100 min-h-screen flex items-center justify-center p-4">
+    <div class="max-w-4xl w-full">
+        <!-- Cabeçalho -->
+        <div class="text-center mb-8">
+            <h1 class="text-3xl font-bold text-floresta">Águia Florestal</h1>
+            <p class="text-gray-600">Selecione seu perfil</p>
+        </div>
+
+        <div id="loading" class="text-center text-gray-500">
+            Carregando perfis...
+        </div>
+
+        <!-- Lista de perfis (estático por enquanto, futuramente via API) -->
+        <div id="profile-list" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-6 justify-items-center">
+            <!-- Exemplo de card de perfil -->
+            <div class="profile-card cursor-pointer text-center" data-apelido="joao">
+                <div
+                    class="w-24 h-24 rounded-full bg-floresta text-white flex items-center justify-center text-4xl font-bold mx-auto mb-2 shadow-lg">
+                    J
+                </div>
+                <span class="block font-medium text-gray-800">João (Operador)</span>
+            </div>
+            <div class="profile-card cursor-pointer text-center" data-apelido="admin">
+                <div
+                    class="w-24 h-24 rounded-full bg-floresta text-white flex items-center justify-center text-4xl font-bold mx-auto mb-2 shadow-lg">
+                    A
+                </div>
+                <span class="block font-medium text-gray-800">Admin</span>
+            </div>
+            <!-- Outros perfis serão adicionados dinamicamente -->
+        </div>
+
+        <!-- Modal de PIN (inicialmente oculto) -->
+        <div id="pin-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center hidden p-4">
+            <div class="bg-white rounded-xl max-w-sm w-full p-6 shadow-2xl">
+                <h2 class="text-2xl font-bold text-floresta mb-4" id="modal-profile-name">João</h2>
+                <p class="text-gray-600 mb-2">Digite seu PIN de acesso</p>
+                <input type="password" id="pin-input" aria-label="PIN de acesso"
+                    class="w-full border border-gray-300 rounded-lg px-4 py-3 text-center text-2xl tracking-widest"
+                    maxlength="6" placeholder="••••••">
+                <div class="flex gap-3 mt-6">
+                    <button id="cancel-pin"
+                        class="flex-1 py-2 bg-gray-200 rounded-lg text-gray-800 font-medium">Cancelar</button>
+                    <button id="submit-pin"
+                        class="flex-1 py-2 bg-floresta text-white rounded-lg font-medium hover:bg-green-800">Entrar</button>
+                </div>
+                <p id="login-error" class="text-red-600 text-sm mt-2 hidden">PIN inválido. Tente novamente.</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Scripts principais -->
+    <script src="js/config.js"></script>
+    <script src="js/api.js"></script>
+    <script src="js/auth.js"></script>
+    <script src="js/db.js"></script>
+    <script src="js/utils.js"></script>
+    <script>
+        // Inicialização da tela de login
+        document.addEventListener('DOMContentLoaded', async () => {
+            sessionStorage.removeItem('token');
+            sessionStorage.removeItem('user');
+            // Carregar perfis do backend (GET /usuarios/perfis)
+            try {
+                const perfis = await api.get('/api/v1/usuarios/perfis');
+                renderPerfis(perfis);
+            } catch (error) {
+                document.getElementById('loading').textContent =
+                    'Backend indisponível. Usando perfis locais...';
+                // fallback para mock
+                renderPerfis([
+                    {
+                        id: "550e8400-e29b-41d4-a716-446655440000",
+                        nome: "João",
+                        apelido: "joao",
+                        tipo: "operador"
+                    },
+                    {
+                        id: "550e8400-e29b-41d4-a716-446655440001",
+                        nome: "Admin",
+                        apelido: "admin",
+                        tipo: "admin"
+                    }
+                ]);
+            }
+
+            function renderPerfis(perfis) {
+                const loading = document.getElementById('loading');
+                if (loading) loading.remove();
+                const container = document.getElementById('profile-list');
+                container.innerHTML = '';
+                perfis.forEach(p => {
+                    const card = document.createElement('div');
+                    card.className = 'profile-card cursor-pointer text-center';
+                    card.dataset.apelido = p.apelido;
+                    card.dataset.nome = p.nome;
+                    card.innerHTML = `
+                        <div class="w-24 h-24 rounded-full bg-floresta text-white flex items-center justify-center text-4xl font-bold mx-auto mb-2 shadow-lg">
+                            ${p.nome.charAt(0).toUpperCase()}
+                        </div>
+                        <span class="block font-medium text-gray-800">${p.nome} (${p.tipo})</span>
+                    `;
+                    container.appendChild(card);
+                });
+
+                // Adicionar evento de clique
+                document.querySelectorAll('.profile-card').forEach(card => {
+                    card.addEventListener('click', () => {
+                        const nome = card.dataset.nome;
+                        const apelido = card.dataset.apelido;
+
+                        document.getElementById('modal-profile-name').textContent = nome;
+                        document.getElementById('pin-modal').dataset.apelido = apelido;
+                        document.getElementById('pin-modal').classList.remove('hidden');
+
+                        // pequeno delay para garantir foco em tablets
+                        setTimeout(() => {
+                            document.getElementById('pin-input').focus();
+                        }, 50);
+                    });
+                });
+            }
+
+            // Modal: cancelar
+            document.getElementById('cancel-pin').addEventListener('click', () => {
+                document.getElementById('pin-modal').classList.add('hidden');
+                document.getElementById('pin-input').value = '';
+                document.getElementById('pin-input').blur();
+                document.getElementById('login-error').classList.add('hidden');
+            });
+
+            // Modal: submeter PIN
+            document.getElementById('submit-pin').addEventListener('click', async () => {
+                const btn = document.getElementById('submit-pin');
+                const apelido = document.getElementById('pin-modal').dataset.apelido;
+                const pin = document.getElementById('pin-input').value;
+
+                if (!pin) {
+                    document.getElementById('login-error').textContent = 'Digite o PIN';
+                    document.getElementById('login-error').classList.remove('hidden');
+                    return;
+                }
+
+                btn.disabled = true;
+
+                try {
+                    await login(apelido, pin);
+                    window.location.href = 'hub.html';
+                } catch (error) {
+                    document.getElementById('login-error').classList.remove('hidden');
+                } finally {
+                    btn.disabled = false;
+                }
+            });
+
+            // Limpar erro quando digitar
+            document.getElementById('pin-input').addEventListener('input', () => {
+                document.getElementById('login-error').classList.add('hidden');
+            });
+
+            // Permitir pressionar ENTER para login
+            document.getElementById('pin-input').addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') {
+                    document.getElementById('submit-pin').click();
+                }
+            });
+        });
+    </script>
+</body>
+
+</html>

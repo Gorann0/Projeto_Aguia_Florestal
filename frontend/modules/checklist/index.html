@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=yes">
+    <title>Checklists</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        .bg-floresta { background-color: #2d6a4f; }
+        .text-floresta { color: #2d6a4f; }
+    </style>
+</head>
+<body class="bg-gray-100 min-h-screen p-4">
+    <div class="max-w-4xl mx-auto">
+        <div class="flex items-center gap-4 mb-6">
+            <a href="../../hub.html" aria-label="Voltar para o hub" class="text-floresta text-2xl">← Voltar</a>
+            <h1 class="text-2xl font-bold text-floresta">Checklists Mensais</h1>
+        </div>
+
+        <!-- Lista de agendamentos pendentes -->
+        <div id="agendamentos-list" class="space-y-3">
+            <p class="text-gray-500">Carregando tarefas...</p>
+        </div>
+    </div>
+
+    <script src="../../js/core/config.js"></script>
+    <script src="../../js/core/api.js"></script>
+    <script src="../../js/core/auth.js"></script>
+    <script src="../../js/core/db.js"></script>
+    <script src="../../js/utils/utils.js"></script>
+    <script src="script.js"></script>
+</body>
+</html>

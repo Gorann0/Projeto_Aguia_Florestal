@@ -86,27 +86,34 @@ export async function pull() {
     const { timestamp, ...entities } = response;
 
     // Atualizar cada store
-    const local = await get(entityType, serverRecord.id);
     for (const [entityType, records] of Object.entries(entities)) {
+
       if (!Array.isArray(records)) continue;
 
       for (const serverRecord of records) {
-        const local = await db.get(entityType, serverRecord.id);
+
+        const local = await get(entityType, serverRecord.id);
+
         if (!local) {
           // Novo registro
           await put(entityType, serverRecord);
         } else {
+
           // Comparar timestamps
           if (new Date(local.atualizado_em) < new Date(serverRecord.atualizado_em)) {
             await put(entityType, serverRecord);
           }
-          // Se local for mais novo, manter local (não sobrescrever)
+
+          // Se local for mais novo, manter local
         }
+
       }
+
     }
 
     await setLastSync(timestamp);
     return timestamp;
+
   } catch (error) {
     console.error('Erro no pull:', error);
     throw error;
@@ -118,6 +125,6 @@ export async function sincronizar() {
   if (!navigator.onLine) {
     throw new Error('Offline');
   }
-  await push();
+  await push().catch(() => {});
   await pull();
 }

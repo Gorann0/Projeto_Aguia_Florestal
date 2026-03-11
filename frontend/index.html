@@ -21,7 +21,7 @@
             background-color: #1b4b34;
         }
     </style>
-    <link rel="manifest" href="manifest.json">
+    <link rel="manifest" href="/manifest.json">
     <meta name="theme-color" content="#2d6a4f">
 </head>
 
@@ -38,7 +38,8 @@
         </div>
 
         <!-- Lista de perfis (estático por enquanto, futuramente via API) -->
-        <div id="profile-list" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-6 justify-items-center">
+        <div id="profile-list"
+class="flex justify-center items-center gap-16 flex-wrap">
             <!-- Exemplo de card de perfil -->
             <div class="profile-card cursor-pointer text-center" data-apelido="joao">
                 <div
@@ -77,11 +78,7 @@
     </div>
 
     <!-- Scripts principais -->
-    <script src="js/config.js"></script>
-    <script src="js/api.js"></script>
-    <script src="js/auth.js"></script>
-    <script src="js/db.js"></script>
-    <script src="js/utils.js"></script>
+    <script type="module" src="/js/main.js"></script>
     <script>
         // Inicialização da tela de login
         document.addEventListener('DOMContentLoaded', async () => {
@@ -89,7 +86,7 @@
             sessionStorage.removeItem('user');
             // Carregar perfis do backend (GET /usuarios/perfis)
             try {
-                const perfis = await api.get('/api/v1/usuarios/perfis');
+                const perfis = await apiGet('/usuarios/perfis');
                 renderPerfis(perfis);
             } catch (error) {
                 document.getElementById('loading').textContent =
@@ -193,6 +190,13 @@
             });
         });
     </script>
+    <script>
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('/service-worker.js')
+                .then(() => console.log('Service Worker registrado'))
+                .catch(err => console.error('Erro ao registrar SW:', err));
+        }
+        </script>
 </body>
 
 </html>

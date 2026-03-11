@@ -1,0 +1,40 @@
+/* css/styles.css */
+
+/* Tailwind já fornece a maioria dos estilos. Este arquivo é para ajustes pontuais. */
+
+/* Garantir que botões e elementos tenham tamanho adequado para tablets */
+button, a, .clickable {
+    min-height: 44px;
+    min-width: 44px;
+  }
+  
+  /* Cor principal da marca (verde floresta) */
+  .bg-floresta {
+    background-color: #2d6a4f;
+  }
+  .text-floresta {
+    color: #2d6a4f;
+  }
+  .hover\:bg-floresta-dark:hover {
+    background-color: #1b4b34;
+  }
+  
+  /* Ajuste para modais */
+  .modal-overlay {
+    background-color: rgba(0, 0, 0, 0.5);
+  }
+  
+  /* Melhor legibilidade em ambientes externos */
+  body {
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    text-rendering: optimizeLegibility;
+    -webkit-font-smoothing: antialiased;
+  }
+  
+  /* Cartões de perfil na tela de login */
+  .profile-card {
+    transition: transform 0.2s;
+  }
+  .profile-card:hover {
+    transform: scale(1.05);
+  }

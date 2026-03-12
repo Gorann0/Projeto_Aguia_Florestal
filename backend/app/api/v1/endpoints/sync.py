@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Body
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from datetime import datetime, timezone
@@ -15,9 +15,9 @@ from app.api.v1.dependencies import get_current_user
 router = APIRouter()
 
 
-@router.post("/pull", response_model=SyncResponse)
+@router.post("/pull", response_model=SyncPullResponse)
 async def pull_updates(
-    last_sync: datetime,
+    last_sync: datetime = Body(..., embed=True),
     db: AsyncSession = Depends(get_db),
     current_user: Usuario = Depends(get_current_user),
 ):

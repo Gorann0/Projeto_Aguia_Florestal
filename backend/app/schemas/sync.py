@@ -20,3 +20,18 @@ class SyncResponse(BaseModel):
     applied: List[dict]
     conflicts: List[dict]
     timestamp: datetime
+
+
+class SyncPullResponse(BaseModel):
+    """
+    Estrutura retornada pelo backend quando o cliente solicita
+    atualizações do servidor.
+    """
+
+    timestamp: datetime
+
+    maquinas: List[dict] = Field(default_factory=list)
+    manuais: List[dict] = Field(default_factory=list)
+    agendamentos: List[dict] = Field(default_factory=list)
+    itens_checklist: List[dict] = Field(default_factory=list)
+    ordens_servico: List[dict] = Field(default_factory=list)

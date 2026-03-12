@@ -3,6 +3,7 @@ from typing import List
 
 
 class Settings(BaseSettings):
+    DEBUG: bool = False
     # Banco de Dados
     POSTGRES_USER: str
     POSTGRES_PASSWORD: str

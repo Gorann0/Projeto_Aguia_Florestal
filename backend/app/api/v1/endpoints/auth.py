@@ -36,30 +36,17 @@ async def login(
     login_data: UsuarioLogin,
     db: AsyncSession = Depends(get_db),
 ):
-    """
-    Realiza o login do usuário com apelido e senha, gerando token JWT.
-    """
-
     await validar_dispositivo(login_data.dispositivo_id, db)
-    # Busca usuário pelo apelido
+
+    # Busca usuário
     result = await db.execute(
         select(Usuario).where(Usuario.apelido == login_data.apelido, Usuario.ativo == True)
     )
     usuario = result.scalar_one_or_none()
-    if not usuario:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Apelido ou senha incorretos",
-        )
+    if not usuario or not verify_password(login_data.senha, usuario.hash_senha):
+        raise HTTPException(status_code=401, detail="Apelido ou senha incorretos")
 
-    # Verifica senha
-    if not verify_password(login_data.senha, usuario.hash_senha):
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Apelido ou senha incorretos",
-        )
-
-    # Limitar número de sessões simultâneas por usuário
+    # Limitar número de sessões simultâneas por usuário (opcional, mas pode ser mantido)
     result = await db.execute(
         select(Sessao).where(
             Sessao.usuario_id == usuario.id,
@@ -68,11 +55,9 @@ async def login(
     )
     sessoes_ativas = result.scalars().all()
     if len(sessoes_ativas) >= settings.MAX_SESSIONS_PER_USER:
-        # Opção: invalidar a sessão mais antiga
         sessoes_ativas.sort(key=lambda s: s.login_em)
         sessao_antiga = sessoes_ativas[0]
         await db.delete(sessao_antiga)
-        await db.commit()
 
     # Cria token
     access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
@@ -81,14 +66,28 @@ async def login(
         expires_delta=access_token_expires,
     )
 
-    # Salva sessão no banco
-    sessao = Sessao(
+    # --- UPSERT: insere ou atualiza a sessão ---
+    from sqlalchemy.dialects.postgresql import insert as pg_insert
+
+    stmt = pg_insert(Sessao).values(
         usuario_id=usuario.id,
         token=access_token,
         dispositivo_id=login_data.dispositivo_id,
         expira_em=datetime.now(timezone.utc) + access_token_expires,
+        revogado=False,
     )
-    db.add(sessao)
+
+    stmt = stmt.on_conflict_do_update(
+        index_elements=['usuario_id', 'dispositivo_id'],
+        set_={
+            'token': access_token,
+            'expira_em': datetime.now(timezone.utc) + access_token_expires,
+            'revogado': False,
+            'ultima_ativacao': datetime.now(timezone.utc),
+        }
+    )
+
+    await db.execute(stmt)
 
     # Atualiza último login
     usuario.ultimo_login = datetime.now(timezone.utc)

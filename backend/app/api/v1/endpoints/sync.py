@@ -9,7 +9,7 @@ from app.models.maquina import Maquina
 from app.models.manual import Manual
 from app.models.checklist import AgendamentoChecklist, ItemChecklist
 from app.models.ordem_servico import OrdemServico
-from app.schemas.sync import SyncRequest, SyncResponse  # (precisamos criar)
+from app.schemas.sync import SyncRequest, SyncResponse, SyncPullResponse
 from app.api.v1.dependencies import get_current_user
 
 router = APIRouter()
@@ -109,7 +109,7 @@ async def push_updates(
                 conflicts.append({
                     "id": os_data.id,
                     "tipo": "ordem_servico",
-                    "mensagem": "Versão local mais antiga que a do servidor"
+                    "mensagem": "Versão local mais antiga que a do servidor",
                     "server_timestamp": existing.atualizado_em
                 })
         else:

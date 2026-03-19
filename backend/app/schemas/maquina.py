@@ -1,9 +1,11 @@
 from pydantic import BaseModel, Field, ConfigDict
 from datetime import datetime
-from typing import Optional, List
+from typing import Optional, List, TYPE_CHECKING
 from .manual import ManualResponse
 from .checklist import ModeloChecklistResponse
 
+if TYPE_CHECKING:
+    from .checklist import ModeloChecklistResponse
 
 class MaquinaBase(BaseModel):
     """Base schema para máquina"""
@@ -56,6 +58,6 @@ class MaquinaComManuaisResponse(MaquinaResponse):
 
 class MaquinaComChecklistsResponse(MaquinaResponse):
     """Schema para máquina com seus modelos de checklist"""
-    modelos_checklist: List[ModeloChecklistResponse] = Field(default_factory=list)
+    modelos_checklist: List['ModeloChecklistResponse'] = Field(default_factory=list)
     
     model_config = ConfigDict(from_attributes=True)
